@@ -3,3 +3,4 @@ channelWidthHalf = int(channelWidth/2)
 filterWidth = 75000 # 75kHz
 filterWidthHalf = int(filterWidth/2)
 filterCountMax = 40
+searchGranularity = int(channelWidthHalf/2)
