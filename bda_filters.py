@@ -1,22 +1,52 @@
+import sys
 import plotly.graph_objects as go
 import itertools
 import copy
 from settings import *
 from gui import *
+from testData.testChannels import *
 
+class Channel:
+    def __init__(self, freqCenter, width=12500):
+        self.freqCenter = freqCenter
+        self.freqLow = freqCenter - int(width/2)
+        self.freqHigh = freqCenter + int(width/2)
+
+
+class Filter:
+    def __init__(self, freqCenter, width=75000):
+        self.freqCenter = freqCenter
+        self.freqLow = freqCenter - int(width/2)
+        self.freqHigh = freqCenter + int(width/2)
+        self.width = width
+        self.channels = []
+
+class Solution:
+    def __init__(self, filters, channels):
+        self.filters = filters
+        self.filterCount = len(filters)
+        self.channels = channels
+
+
+
+channelWidthHalf = int(channelWidth/2)
+filterWidthHalf = int(filterWidth/2)
+searchGranularity = int(channelWidthHalf/2) #TODO find minimum value
+
+# Given a potential filter, existing filters, and channels, check if new filter is valid.
+# If filter is valid, return True.
+# If not valid, return False.
 def validateFilter(newFilter, filters, channels):
     filterValid = True
-    # Filter can't split channel
+    # Filter can't split a channel. Channel must be fully in or out of filter.
     for channel in channels:    
         filterValid = filterValid and checkFilterSplit(newFilter, channel)
 
-    # Filter can't overlap other filter
+    # Filter can't overlap any other filter.
     for filter in filters:
         filterValid = filterValid and not checkFilterOverlap(newFilter, filter)
-        # if checkFilterOverlap(newFilter, filter):
-        #     print("filters can't overlap!")
 
-    # Filter must contain a channel
+    # Filter must fully pass at least one channel.
     filterContainsChannel = False
     for channel in channels:
         filterContainsChannel = filterContainsChannel or checkChannelInFilter(newFilter, channel)
@@ -25,6 +55,9 @@ def validateFilter(newFilter, filters, channels):
     return filterValid
 
 # Given a filter and channel, check if channel is within filter
+# Given a filter and channel, check if the channel is fully passed by filter.
+# If channel fully passes, return True.
+# If not, return False.
 def checkChannelInFilter(filter, channel):
     cLower = channel - channelWidthHalf
     cUpper = channel + channelWidthHalf
@@ -40,15 +73,15 @@ def checkFilterSplit(filter, channel):
     cLower = channel - channelWidthHalf
     return not ((cLower < fLower < cUpper) or (cLower < fUpper < cUpper))
 
-# Check if filters overlap
-def checkFilterOverlap(freq1, freq2):
-    x1 = freq1 - filterWidthHalf
-    x2 = freq1 + filterWidthHalf
-    y1 = freq2 - filterWidthHalf
-    y2 = freq2 + filterWidthHalf
-    # if (x1 < y2) and (y1 < x2):
-    #     print(x1, x2, y1, y2)
-    return (x1 < y2) and (y1 < x2)
+# Given two filters of identical width, check if filters overlap.
+# If filters overlap (invalid), return True.
+# If filters don't overlap, return False. 
+def checkFilterOverlap(filter1, filter2):
+    f1Lower = filter1 - filterWidthHalf
+    f1Upper = filter1 + filterWidthHalf
+    f2Lower = filter2 - filterWidthHalf
+    f2Upper = filter2 + filterWidthHalf
+    return (f1Lower < f2Upper) and (f2Lower < f1Upper)
 
 # Check if channel is fully passed by only one filter in filter list
 def checkChannel(fig, channel, filters):
@@ -68,6 +101,9 @@ def checkChannel(fig, channel, filters):
         drawUncoveredChannel(fig, channel)
     return filterCount == 1
 
+# Check if set of channels and filters are valid.
+# Solution is valid if no filters overlap and if all channels are fully passed.
+# Return True if valid.
 def checkSolution(fig, channels, filters):
     validSolution = True
     filterCombos = list(itertools.combinations(filters, 2))
@@ -87,9 +123,14 @@ def checkSolution(fig, channels, filters):
     print("Valid solution:", validSolution)
     return validSolution
 
+# Check if channels are far enough apart such that no valid filter on one could affect the other.
+# If indpendent, return True.
+# If not, return False.
 def channelsAreIndependent(f1, f2):
     return (f2-f1) + channelWidth >= 2 * filterWidth
 
+# Given a list of channels, split channels into independent groups.
+# Return list of list of channels.
 def splitChannels(fig, channels):
     channels.sort()
     channelRanges = []
@@ -114,7 +155,6 @@ def getChannelsInFilter(channels, filter):
     return channelList
 
 def solveChannelsRec(solutions, channels, existingFilters, newFilters):
-    # print("called rec with channels", channels)
     # If no channels remain to be covered, we're done.
     if len(channels) == 0:
         solutions.append(newFilters)
@@ -128,7 +168,6 @@ def solveChannelsRec(solutions, channels, existingFilters, newFilters):
         if(validateFilter(newFilter, existingFilters+newFilters, channels)):
             # Add filter to existing filter list
             newFilters.append(newFilter)
-            # print("Adding filter:", newFilter)
             # Remove channels covered by new filter to create new channel subsets
             channelsInFilter = getChannelsInFilter(channelsCopyRec, newFilter)
             for channel in channelsInFilter:
@@ -137,95 +176,68 @@ def solveChannelsRec(solutions, channels, existingFilters, newFilters):
             solveChannelsRec(solutions, channelsCopyRec, existingFilters, newFilters)
     return
 
-def solveChannels(fig, channels, existingFilters):
-    # print("existing filters", existingFilters)
-    print("called solve with channels", channels)
+def solveChannels(channels, existingFilters):
     # Pick filter
     # if valid, solve recurrisvely
-    # Minimum low filter center = channel + 1/2 channelWidth - 1/2 filterWidth
-    # Maximum high filter center = channel - 1/2 channelWidth + 1/2 filterWidth
     fLow = min(channels) + channelWidthHalf - filterWidthHalf
     fHigh = max(channels) - channelWidthHalf + filterWidthHalf
     solutions = []
     for grid in range(fLow, fHigh + searchGranularity, searchGranularity):
-        # print("Starting with grid", grid, "and channels", channels)
         channelsCopy = copy.deepcopy(channels)
         newFilters = []
         # Pick filter
         newFilter = grid
         if(validateFilter(newFilter, existingFilters+newFilters, channelsCopy)):
-            # print("validated filter", newFilter)
             # Add filter to existing filter list
             newFilters.append(newFilter)
-            # print("Adding filter:", newFilter)
             # Remove channels covered by new filter to create new channel subsets
             channelsInFilter = getChannelsInFilter(channelsCopy, newFilter)
             for channel in channelsInFilter:
                 channelsCopy.remove(channel)
             # solve recurrsively
             solveChannelsRec(solutions, channelsCopy, existingFilters, newFilters)
-            # print("filter solutions:",solutions)
-        # else:
-            # print("filter invalid", newFilter)
-        # exit()
-    # exit()
-    # drawFilter(fig, fLow+searchGranularity)
-    # drawFilter(fig, fHigh)
-    # print(len(solutions))
-    # for solution in solutions:
-    #     print(len(solution))
-    # exit()
     return solutions
 
+def getChannelsFromFile(filePath, channelsAll):
+    f = open(filePath,"r")
+    for line in f.read().splitlines():
+        channel = float(line.replace(",",""))
+        # If input is in MHz, convert to Hz.
+        if channel < 1000:
+            channel = channel * 1000000
+        # Check if input is within US Dl ranges.
+        if not((758000000 <= channel <= 775000000) or (851000000 <= channel <= 869000000)):
+            print("Error:", channel, "is outside of US DL ranges.")
+            exit(1)
+
+        channel = int(channel)
+        # Check for duplicate channels
+        if channel in channelsAll:
+            print("Error:", channel, "appears in input twice.")
+            exit(1)
+        # Add channel to list
+        channelsAll.append(channel)
+    return
+
 def main():
+    if(len(sys.argv)==1):
+        print("Error: Please provide path to channel lists (csv/txt) as argument.")
+        exit(1)
+    
+    # Get channels from file arguments
+    channelsAll = []
+    for path in sys.argv[1:]:
+        getChannelsFromFile(path, channelsAll)
+
+    print("Channels:", len(channelsAll))
+
     fig = go.Figure()
 
-    fig.add_trace(go.Scatter(
-        x=[1.5, 4.5],
-        y=[0.75, 0.75],
-        text=["Unfilled Rectangle", "Filled Rectangle"],
-        mode="text",
-    ))
+    # Split channels into independent subgroups
+    # Solve all subgroups
+    # Find best solution
 
-    channels = [854337500,
-                854612500,
-                855987500,
-                856487500,
-                856662500,
-                856987500,
-                857487500,
-                857987500,
-                858487500,
-                858987500,
-                859487500,
-                859987500,
-                851037500,
-                851150000,
-                851200000,
-                851262500,
-                851287500,
-                851462500,
-                851537500,
-                851625000,
-                851650000,
-                851762500,
-                851962500,
-                852150000,
-                852262500,
-                852650000,
-                852787500,
-                852962500,
-                853150000,
-                853200000,
-                853262500,
-                853462500,
-                853650000,
-                853762500,
-                853925000,
-                853962500,
-                855462500]
-
-    channelsReduced = splitChannels(fig, channels)
+    channelSubgroups = splitChannels(fig, channelsAll)
 
     # filterCountUnused = filterCountMax - (len(channels) - len(channelsReduced))
     # print(filterCountUnused)
@@ -233,38 +245,33 @@ def main():
     filters = []
 
     # Add filters 1:1 to single isolated channels
-    for channelSubset in channelsReduced:
-        if len(channelSubset) == 1:
-            filters.append(channelSubset[0])
+    for channelSubgroup in channelSubgroups:
+        if len(channelSubgroup) == 1:
+            filters.append(channelSubgroup[0])
         else:
-            solutions = solveChannels(fig, channelSubset, filters)
+            solutions = solveChannels(channelSubgroup, filters)
             filters = filters+max(solutions, key=len)
 
-
-    # for channelSubset in channelsReduced:
-    #     if len(channelSubset) != 1:
-
-    #         print(channelSubset[0], validateFilter(channelSubset[0],filters, channelSubset))
-    #         filters.append(channelSubset[0])
-
     plotFreqMargin = 200000 # Padding to add to sides of plot
-    freqRange = [min(min(channels), min(filters)) - plotFreqMargin, max(max(channels), max(filters)) + plotFreqMargin]
+    freqRange = [min(min(channelsAll), min(filters)) - plotFreqMargin, max(max(channelsAll), max(filters)) + plotFreqMargin]
 
     # Set axes properties
     fig.update_xaxes(range=freqRange, showgrid=False)
     fig.update_yaxes(range=[0, 1])
     
-    for channel in channels:
+    for channel in channelsAll:
         drawChannel(fig, channel)
 
     for filter in filters:
         drawFilter(fig, filter)
 
-    checkSolution(fig, channels, filters)
+    checkSolution(fig, channelsAll, filters)
 
     fig.update_shapes(dict(xref='x', yref='y'))
     fig.show()
     print("filters used:",len(filters))
+    
+    print(filters)
     exit()
 
 if __name__ == "__main__":
