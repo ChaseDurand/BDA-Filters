@@ -5,6 +5,10 @@ import copy
 from settings import filterWidth, channelWidth, filterCountMax
 from gui import drawSplit, drawUncoveredChannel, drawConflict, renderGUI
 
+channelWidthHalf = int(channelWidth/2)
+filterWidthHalf = int(filterWidth/2)
+searchGranularity = int(channelWidthHalf/1) #TODO find minimum value
+
 class Channel:
     def __init__(self, freqCenter, width=12500):
         self.freqCenter = freqCenter
@@ -60,11 +64,6 @@ def getChannelsInFilter(filter, channels):
         if(checkChannelInFilter(filter, channel)):
             channelsInFilter.append(channel)
     return channelsInFilter
-
-channelWidthHalf = int(channelWidth/2)
-filterWidthHalf = int(filterWidth/2)
-searchGranularity = int(channelWidthHalf/1) #TODO find minimum value
-
 
 # Given a potential filter, existing filters, and channels, check if new filter is valid.
 # If filter is valid, return True.
@@ -165,8 +164,6 @@ def splitChannels(fig, channels):
                 lowIndex = i       
     return channelRanges
 
-
-
 def solveChannelsRec(subChannels, solutions, channelsCopy, newFilters):
     # If no channels remain to be covered, we're done.
     if len(channelsCopy) == 0:
@@ -261,10 +258,10 @@ def main():
 
     fig = go.Figure()
 
-    # Split channels into independent subgroups
-    # Solve all subgroups
-    # Find best solution
+    # Split channels into independent subgroups.
+    # For each subgroup, find best solution per filter count.
     channelSubgroups = splitChannels(fig, channelsAll)
+    # subgroupSolutions are list of dicts mapping filterCount to SubSolution
     subgroupSolutions = [None] * len(channelSubgroups)
     for i in range(0, len(channelSubgroups)):
         channelSubgroup = channelSubgroups[i]
@@ -279,22 +276,22 @@ def main():
         else:
             subgroupSolutions[i] = solveChannels(channelSubgroup)
 
+    # Get all combinations of subgroupSolutions.
+    # Create Solution for each combination.
     solutionCombos = list(itertools.product(*subgroupSolutions))
-
     solutions = []
-
     for s in solutionCombos:
         subSolutionList = []
         for i in range(0, len(s)):
             subSolutionList.append(subgroupSolutions[i][s[i]])
         solutions.append(Solution(subSolutionList))
-
+    # Sort solutions from worst to best.
     solutions.sort(key=lambda i: (i.filterCount, i.channelScore, i.centerScore))
     
     print("Max filter solution uses", solutions[-1].filterCount, "filters.")
     print("Min filter solution uses", solutions[0].filterCount, "filters.")
 
-    # Traverse solution list until filter count is within limit.
+    # Traverse solution list until filter count is within limit or until end of list.
     filters = []
     for i in reversed(range(0, len(solutions))):
         if solutions[i].filterCount <= filterCountMax:
@@ -306,6 +303,7 @@ def main():
             for s in solutions[i].subSolutions:
                 filters += s.filters
             checkSolution(fig, channelsAll, filters)
+            # Print filters and write to file.
             print("Filters used:",len(filters))
             f = open("filters.txt", "w")
             for filter in filters:
