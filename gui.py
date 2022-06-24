@@ -1,5 +1,3 @@
-from settings import filterWidth, channelWidth, plotFreqMargin
-
 # Draw a line separating independent channel groups.
 def drawSplit(fig, freq):
     fig.add_shape(type="rect",
@@ -57,6 +55,7 @@ def drawConflict(fig, filter):
     )
 
 def renderGUI(fig, channels, filters):
+    plotFreqMargin = 200000 # Padding to add to sides of plot
     freqRange = [min(min(channels, key=lambda channel: channel.freqCenter).freqCenter,\
         min(filters, key=lambda filter: filter.freqCenter).freqCenter) - plotFreqMargin,\
             max(max(channels, key=lambda channel: channel.freqCenter).freqCenter,\

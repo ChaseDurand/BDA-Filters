@@ -7,13 +7,15 @@ Utility for determining optimal BDA filter configurations for US public safety r
 This utility solves this problem by determining optimal filter configuration given a channel list and filter limitations (i.e. the number of filters and the filter bandwidths). Filters are selected in order to maximize the number of filters in order to maximize control granularity for each band, ideally targeting 1:1 filter to channel placement.
 
 # Usage
-Pass a list of channels (.csv or .txt) as an argument:
+Pass a list of channels (.csv or .txt) as an argument. If a valid solution is found, filters are output to filters.txt.
 
 ```python3 bda_filters.py "path/to/channels.csv"```
 
-Multiple channel lists can be passed at once:
+Multiple channel lists can be passed at once.
 
 ```python3 bda_filters.py "path/to/channels.csv" "path/to/moreChannels.txt"```
+
+Channel width, filter width, and number of filters can be adjusted in [settings.py](settings.py).
 
 # Requirements
 * python 3.10+
@@ -21,4 +23,4 @@ Multiple channel lists can be passed at once:
 
 
 # Disclaimer
-Use this tool at your own risk. None of this methodology has been reviewed or endorsed by the FCC or any AHJ.
+Use this tool at your own risk. None of this methodology has been reviewed or endorsed by the FCC. Ensure approval by all affected PLMRS licensees before deploying signal boosters.

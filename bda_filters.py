@@ -65,6 +65,7 @@ channelWidthHalf = int(channelWidth/2)
 filterWidthHalf = int(filterWidth/2)
 searchGranularity = int(channelWidthHalf/1) #TODO find minimum value
 
+
 # Given a potential filter, existing filters, and channels, check if new filter is valid.
 # If filter is valid, return True.
 # If not valid, return False.
