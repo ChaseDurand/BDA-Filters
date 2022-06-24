@@ -62,7 +62,7 @@ def renderGUI(fig, channels, filters):
                 max(filters, key=lambda filter: filter.freqCenter).freqCenter) + plotFreqMargin]
     # Set axes properties
     fig.update_xaxes(range=freqRange, showgrid=False)
-    fig.update_yaxes(range=[0, 1])
+    fig.update_yaxes(range=[0, 1], visible=False)
     
     for channel in channels:
         drawChannel(fig, channel)

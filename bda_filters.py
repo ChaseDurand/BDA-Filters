@@ -110,7 +110,8 @@ def checkFilterOverlap(filter1, filter2):
 def checkChannel(fig, channel, filters):
     filterCount = 0
     for filter in filters:
-        if (filter.freqLow <= channel.freqLow <= filter.freqHigh) and (filter.freqLow <= channel.freqHigh <= filter.freqHigh):
+        if (filter.freqLow <= channel.freqLow <= filter.freqHigh)\
+            and (filter.freqLow <= channel.freqHigh <= filter.freqHigh):
             filterCount += 1
     if filterCount == 0:
         print("Channel", channel.freqCenter, "not passed!")
@@ -300,7 +301,8 @@ def main():
             # Solution within limits has been found.
             # Print results and write to file.
             # Render GUI.
-            print("Best solution within limits:", solutions[i].filterCount, solutions[i].channelScore, solutions[i].centerScore)
+            print("Best solution within limits:", solutions[i].filterCount,\
+                solutions[i].channelScore, solutions[i].centerScore)
             for s in solutions[i].subSolutions:
                 filters += s.filters
             checkSolution(fig, channelsAll, filters)
