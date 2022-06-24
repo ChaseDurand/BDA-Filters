@@ -22,7 +22,7 @@ Multiple channel lists can be passed at once.
 Channel width, filter width, and number of filters can be adjusted in [settings.py](settings.py).
 
 # Requirements
-* python 3.10+
+* Python 3.6+
 * plotly
 
 
