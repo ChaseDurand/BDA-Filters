@@ -1,6 +1,10 @@
 # BDA-Filters
 Utility for determining optimal BDA filter configurations for US public safety radio channels.
 
+<p align='center'>
+<img width=100% alt='GUI screenshot' src='docs/gui.png'>
+</p>
+
 # Rationale
 [FCC Part 90](https://www.ecfr.gov/current/title-47/chapter-I/subchapter-D/part-90/subpart-I/section-90.219) Class A (channelized) signal boosters have a limited number of configurable filters with variable bandwidths. Ideally, filters would be configured 1:1 with signals they are intended to amplify. This approach often fails due to delay limitations and the number and position of desired channels. Narrow filters induce long delays which can result in time delay interference or an unusable system, so filter bandwidths must be increased to reduce delays to acceptable amounts. Widening filters can cause neighboring filters to overlap, which is not possible in most BDAs. Dense groups of desired channels and/or more desired channels than available filters necessitates filters passing multiple channels.
 
