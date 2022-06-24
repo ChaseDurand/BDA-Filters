@@ -3,3 +3,4 @@ __pycache__/
 !/.gitignore
 first_figure.html
 testData/
+filters.txt

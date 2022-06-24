@@ -1,10 +1,9 @@
 import sys
-from typing import final
 import plotly.graph_objects as go
 import itertools
 import copy
 from settings import filterWidth, channelWidth, filterCountMax
-from gui import drawSplit, drawUncoveredChannel, drawConflict, renderGUI    
+from gui import drawSplit, drawUncoveredChannel, drawConflict, renderGUI
 
 class Channel:
     def __init__(self, freqCenter, width=12500):
@@ -35,7 +34,7 @@ class Filter:
         for channel in self.channels:
             freqSum += channel.freqCenter
         freqAverage = int(freqSum / len(self.channels))
-        delta = abs(self.freqCenter - freqAverage) / 1000000
+        delta = (self.freqCenter - freqAverage) / 1000000
         self.centerScore = -1 * (delta * delta)
         return
 
@@ -44,12 +43,15 @@ class SubSolution:
         self.filters = filters
         self.filterCount = len(filters)
         self.channels = channels
-        self.totalChannelScore = sum(f.channelScore for f in filters) / self.filterCount
-        self.totalCenterScore = sum(f.centerScore for f in filters) / self.filterCount
+        self.channelScore = sum(f.channelScore for f in filters) / self.filterCount
+        self.centerScore = sum(f.centerScore for f in filters) / self.filterCount
 
 class Solution:
     def __init__(self, subSolutions):
-        self.subSolutions = []
+        self.subSolutions = subSolutions
+        self.filterCount = sum(s.filterCount for s in subSolutions)
+        self.channelScore = sum(s.channelScore for s in subSolutions) / len(subSolutions)
+        self.centerScore = sum(s.centerScore for s in subSolutions) / len(subSolutions)
 
 # Given channels and a filter, return all filters passed by the channel
 def getChannelsInFilter(filter, channels):
@@ -61,7 +63,7 @@ def getChannelsInFilter(filter, channels):
 
 channelWidthHalf = int(channelWidth/2)
 filterWidthHalf = int(filterWidth/2)
-searchGranularity = int(channelWidthHalf/2) #TODO find minimum value
+searchGranularity = int(channelWidthHalf/1) #TODO find minimum value
 
 # Given a potential filter, existing filters, and channels, check if new filter is valid.
 # If filter is valid, return True.
@@ -163,11 +165,18 @@ def splitChannels(fig, channels):
 
 
 
-def solveChannelsRec(subChannels, solutions, channelsCopy, existingFilters, newFilters):
+def solveChannelsRec(subChannels, solutions, channelsCopy, newFilters):
     # If no channels remain to be covered, we're done.
     if len(channelsCopy) == 0:
         solution = SubSolution(newFilters, subChannels)
-        solutions.append(solution)
+        # Reduce solutions to best solution per number of filters
+        if solution.filterCount in solutions:
+            # If we already have a solution for this number of filters, only save best.
+            solutionOptions = [solution, solutions[solution.filterCount]]
+            solutionOptions.sort(key=lambda i: (i.filterCount, i.channelScore, i.centerScore))
+            solutions[solution.filterCount] = solutionOptions[-1]
+        else:
+            solutions[solution.filterCount] = solution
         return
     # Find min and max
     fLow = min(channelsCopy).freqCenter + channelWidthHalf - filterWidthHalf
@@ -176,7 +185,7 @@ def solveChannelsRec(subChannels, solutions, channelsCopy, existingFilters, newF
         newFiltersCopy = copy.copy(newFilters)
         channelsCopyRec = copy.copy(channelsCopy)
         newFilter = Filter(grid)
-        if(validateFilter(newFilter, existingFilters+newFiltersCopy, channelsCopy)):
+        if(validateFilter(newFilter, newFiltersCopy, channelsCopy)):
             channelsInFilter = getChannelsInFilter(newFilter, channelsCopyRec)
             newFilter.channels = channelsInFilter
             newFilter.calcFilterCenterScore()
@@ -187,21 +196,21 @@ def solveChannelsRec(subChannels, solutions, channelsCopy, existingFilters, newF
             for channel in channelsInFilter:
                 channelsCopyRec.remove(channel)
             # solve recurrsively
-            solveChannelsRec(channelsCopy, solutions, channelsCopyRec, existingFilters, newFiltersCopy)
+            solveChannelsRec(channelsCopy, solutions, channelsCopyRec, newFiltersCopy)
     return
 
-def solveChannels(channels, existingFilters):
+def solveChannels(channels):
     # Pick filter
     # if valid, solve recurrisvely
     fLow = min(channels).freqCenter + channelWidthHalf - filterWidthHalf
     fHigh = (max(channels).freqCenter - channelWidthHalf) + filterWidthHalf
-    solutions = []
+    solutions = {}
     for grid in range(fLow, fHigh + searchGranularity, searchGranularity):
         channelsCopy = copy.copy(channels)
         newFilters = []
         # Pick filter
         newFilter = Filter(grid)
-        if(validateFilter(newFilter, existingFilters+newFilters, channelsCopy)):
+        if(validateFilter(newFilter, newFilters, channelsCopy)):
             channelsInFilter = getChannelsInFilter(newFilter, channelsCopy)
             newFilter.channels = channelsInFilter
             newFilter.calcFilterCenterScore()
@@ -212,7 +221,7 @@ def solveChannels(channels, existingFilters):
             for channel in channelsInFilter:
                 channelsCopy.remove(channel)
             # solve recurrsively
-            solveChannelsRec(channels, solutions, channelsCopy, existingFilters, newFilters)
+            solveChannelsRec(channels, solutions, channelsCopy, newFilters)
     return solutions
 
 def getChannelsFromFile(filePath, channelsAll):
@@ -254,35 +263,56 @@ def main():
     # Solve all subgroups
     # Find best solution
     channelSubgroups = splitChannels(fig, channelsAll)
-
-    # filterCountUnused = filterCountMax - (len(channels) - len(channelsReduced))
-    # print(filterCountUnused)
-
-    filters = []
-    finalSolutions = []
-    # Add filters 1:1 to single isolated channels
-    for channelSubgroup in channelSubgroups:
+    subgroupSolutions = [None] * len(channelSubgroups)
+    for i in range(0, len(channelSubgroups)):
+        channelSubgroup = channelSubgroups[i]
         print("Solving subset of size", len(channelSubgroup))
         if len(channelSubgroup) == 1:
+            # Add filters 1:1 to single isolated channels
             newFilter = Filter(channelSubgroup[0].freqCenter)
             newFilter.channels = [channelSubgroup[0]]
             newFilter.calcFilterChannelScore()
             newFilter.calcFilterCenterScore()
-            filters.append(newFilter)
+            subgroupSolutions[i] = {1: SubSolution([newFilter], channelSubgroup)}
         else:
-            solutions = solveChannels(channelSubgroup, filters)
-            solutions.sort(key=lambda i: (i.filterCount, i.totalChannelScore, i.totalCenterScore))
-            finalSolutions.append(solutions[-1])
-            filters = filters+solutions[-1].filters
+            subgroupSolutions[i] = solveChannels(channelSubgroup)
 
-    checkSolution(fig, channelsAll, filters)
-    print("Filters used:",len(filters))
-    for filter in filters:
-        print(filter)
+    solutionCombos = list(itertools.product(*subgroupSolutions))
 
-    renderGUI(fig, channelsAll, filters)
+    solutions = []
 
-    exit()
+    for s in solutionCombos:
+        subSolutionList = []
+        for i in range(0, len(s)):
+            subSolutionList.append(subgroupSolutions[i][s[i]])
+        solutions.append(Solution(subSolutionList))
+
+    solutions.sort(key=lambda i: (i.filterCount, i.channelScore, i.centerScore))
+    
+    print("Max filter solution uses", solutions[-1].filterCount, "filters.")
+    print("Min filter solution uses", solutions[0].filterCount, "filters.")
+
+    # Traverse solution list until filter count is within limit.
+    filters = []
+    for i in reversed(range(0, len(solutions))):
+        if solutions[i].filterCount <= filterCountMax:
+            # Solution within limits has been found.
+            # Print results and write to file.
+            # Render GUI.
+            print("Best solution within limits:", solutions[i].filterCount, solutions[i].channelScore, solutions[i].centerScore)
+            for s in solutions[i].subSolutions:
+                filters += s.filters
+            checkSolution(fig, channelsAll, filters)
+            print("Filters used:",len(filters))
+            f = open("filters.txt", "w")
+            for filter in filters:
+                print(filter)
+                f.write(str(filter)+",\n")
+            f.close()
+            renderGUI(fig, channelsAll, filters)
+            exit(0)
+    print("Error: No solution for", filterCountMax, "filters.")
+    exit(0)
 
 if __name__ == "__main__":
     main()
