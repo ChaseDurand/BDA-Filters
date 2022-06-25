@@ -10,7 +10,7 @@ filterWidthHalf = int(filterWidth/2)
 searchGranularity = int(channelWidthHalf/1) #TODO find minimum value
 
 class Channel:
-    def __init__(self, freqCenter, width=12500):
+    def __init__(self, freqCenter, width=channelWidth):
         self.freqCenter = freqCenter
         self.freqLow = freqCenter - int(width/2)
         self.freqHigh = freqCenter + int(width/2)
@@ -20,7 +20,7 @@ class Channel:
         return str(self.freqCenter)
 
 class Filter:
-    def __init__(self, freqCenter, width=75000):
+    def __init__(self, freqCenter, width=filterWidth):
         self.freqCenter = freqCenter
         self.freqLow = freqCenter - int(width/2)
         self.freqHigh = freqCenter + int(width/2)
@@ -164,6 +164,7 @@ def splitChannels(fig, channels):
                 lowIndex = i       
     return channelRanges
 
+# Recursive portion of solveChannels.
 def solveChannelsRec(subChannels, solutions, channelsCopy, newFilters):
     # If no channels remain to be covered, we're done.
     if len(channelsCopy) == 0:
@@ -177,9 +178,10 @@ def solveChannelsRec(subChannels, solutions, channelsCopy, newFilters):
         else:
             solutions[solution.filterCount] = solution
         return
-    # Find min and max
+    # Find range of possible filter frequencies.
     fLow = min(channelsCopy).freqCenter + channelWidthHalf - filterWidthHalf
     fHigh = (max(channelsCopy).freqCenter - channelWidthHalf) + filterWidthHalf
+    # Create filter and check if valid.
     for grid in range(fLow, fHigh + channelWidthHalf, searchGranularity):
         newFiltersCopy = copy.copy(newFilters)
         channelsCopyRec = copy.copy(channelsCopy)
@@ -189,21 +191,23 @@ def solveChannelsRec(subChannels, solutions, channelsCopy, newFilters):
             newFilter.channels = channelsInFilter
             newFilter.calcFilterCenterScore()
             newFilter.calcFilterChannelScore()
-            # Add filter to existing filter list
+            # Add filter to existing filter list.
             newFiltersCopy.append(newFilter)
-            # Remove channels covered by new filter to create new channel subsets
+            # Remove channels covered by new filter to create new channel subset.
             for channel in channelsInFilter:
                 channelsCopyRec.remove(channel)
-            # solve recurrsively
+            # Solve remaining channels recurrsively.
             solveChannelsRec(channelsCopy, solutions, channelsCopyRec, newFiltersCopy)
     return
 
+# Initial recursive driver to find solutions for a set of channels.
+# Return dict mapping filterCount to SubSolution.
 def solveChannels(channels):
-    # Pick filter
-    # if valid, solve recurrisvely
+    # Find range of possible filter frequencies.
     fLow = min(channels).freqCenter + channelWidthHalf - filterWidthHalf
     fHigh = (max(channels).freqCenter - channelWidthHalf) + filterWidthHalf
     solutions = {}
+    # Create filter and check if valid.
     for grid in range(fLow, fHigh + searchGranularity, searchGranularity):
         channelsCopy = copy.copy(channels)
         newFilters = []
@@ -214,12 +218,12 @@ def solveChannels(channels):
             newFilter.channels = channelsInFilter
             newFilter.calcFilterCenterScore()
             newFilter.calcFilterChannelScore()
-            # Add filter to existing filter list
+            # Add filter to existing filter list.
             newFilters.append(newFilter)
-            # Remove channels covered by new filter to create new channel subsets
+            # Remove channels covered by new filter to create new channel subset.
             for channel in channelsInFilter:
                 channelsCopy.remove(channel)
-            # solve recurrsively
+            # Solve remaining channels recurrsively.
             solveChannelsRec(channels, solutions, channelsCopy, newFilters)
     return solutions
 
@@ -261,7 +265,6 @@ def main():
     # Split channels into independent subgroups.
     # For each subgroup, find best solution per filter count.
     channelSubgroups = splitChannels(fig, channelsAll)
-    # subgroupSolutions are list of dicts mapping filterCount to SubSolution
     subgroupSolutions = [None] * len(channelSubgroups)
     for i in range(0, len(channelSubgroups)):
         channelSubgroup = channelSubgroups[i]
