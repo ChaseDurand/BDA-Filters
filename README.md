@@ -10,7 +10,7 @@ Utility for determining optimal BDA filter configurations for US public safety r
 * plotly
 
 ## Usage
-Pass a list of channels (.csv or .txt) as an argument. If a valid solution is found, filters are output to filters.txt.
+Pass a list of channels (.csv or .txt) as an argument. If a valid solution is found, filters are output as filters.txt.
 
 ```python3 bda_filters.py "path/to/channels.csv"```
 
